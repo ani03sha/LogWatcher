@@ -105,7 +105,7 @@ public class LogWatcherScheduler implements Runnable {
 	/**
 	 * This method does the job of watching the logs
 	 */
-	private void watchLog() {
+	private final void watchLog() {
 
 		try {
 
@@ -186,7 +186,7 @@ public class LogWatcherScheduler implements Runnable {
 	 * @param errorTypes
 	 * @param filePath
 	 */
-	private void checkForErrors(List<String> errorTypes, String filePath, String logFile) {
+	private final void checkForErrors(List<String> errorTypes, String filePath, String logFile) {
 
 		try {
 
