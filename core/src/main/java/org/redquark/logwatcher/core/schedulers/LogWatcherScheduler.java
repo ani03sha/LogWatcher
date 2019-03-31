@@ -25,6 +25,7 @@ import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Reference;
 import org.osgi.service.metatype.annotations.Designate;
 import org.redquark.logwatcher.core.configs.LogWatcherConfiguration;
+import org.redquark.logwatcher.core.email.EmailService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -48,6 +49,10 @@ public class LogWatcherScheduler implements Runnable {
 	// Reference for Scheduler API injection
 	@Reference
 	private Scheduler scheduler;
+	
+	// Reference of the EmailService
+	@Reference
+	private EmailService emailService;
 
 	/**
 	 * This method does the initialization tasks
@@ -186,7 +191,7 @@ public class LogWatcherScheduler implements Runnable {
 		try {
 
 			// Getting the actual file path for Java - by escaping special characters
-			String finalPath = filePath.replaceAll("\\", "\\\\") + "\\" + logFile;
+			String finalPath = filePath + "\\" + logFile;
 
 			// Getting the input bytes from the file represented by finalPath
 			FileInputStream fis = new FileInputStream(finalPath);
@@ -245,6 +250,11 @@ public class LogWatcherScheduler implements Runnable {
 					}
 				}
 				
+				// Appending new lines
+				sb.append("\n\n");
+				
+				// Sending the email
+				emailService.sendEmail(sb.toString());
 				
 				// Close BufferedReader
 				br.close();
