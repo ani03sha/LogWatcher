@@ -17,11 +17,14 @@ import java.nio.file.WatchService;
 import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.UUID;
 
 import org.apache.sling.commons.scheduler.ScheduleOptions;
 import org.apache.sling.commons.scheduler.Scheduler;
 import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
+import org.osgi.service.component.annotations.Deactivate;
+import org.osgi.service.component.annotations.Modified;
 import org.osgi.service.component.annotations.Reference;
 import org.osgi.service.metatype.annotations.Designate;
 import org.redquark.logwatcher.core.configs.LogWatcherConfiguration;
@@ -49,13 +52,17 @@ public class LogWatcherScheduler implements Runnable {
 	// Reference for Scheduler API injection
 	@Reference
 	private Scheduler scheduler;
-	
+
+	// Scheduler Id to add/remove scheduler on modifications
+	private String schedulerId;
+
 	// Reference of the EmailService
 	@Reference
 	private EmailService emailService;
 
 	/**
 	 * This method does the initialization tasks
+	 * 
 	 * @param logWatcherConfiguration
 	 */
 	@Activate
@@ -69,8 +76,39 @@ public class LogWatcherScheduler implements Runnable {
 		// Initializing list
 		types = new LinkedList<>();
 
-		// Add the scheduler
+		// Creating the scheduler id - this will be needed for scheduling and
+		// unscheduling whenever the configuration is modified
+		schedulerId = UUID.randomUUID().toString();
+	}
+
+	/**
+	 * This will be called when the configuration modifies
+	 * 
+	 * @param autoFileUploaderConfiguration
+	 */
+	@Modified
+	protected void modified(LogWatcherConfiguration logWatcherConfiguration) {
+
+		// Removing the scheduler
+		removeScheduler();
+
+		// Modify the schedulerId - Update
+		schedulerId = UUID.randomUUID().toString();
+
+		// Adding the scheduler again with updated id
 		addScheduler();
+	}
+
+	/**
+	 * This will be called when the configuration is removed
+	 * 
+	 * @param autoFileUploaderConfiguration
+	 */
+	@Deactivate
+	protected void deactivate(LogWatcherConfiguration logWatcherConfiguration) {
+
+		// Removing the scheduler
+		removeScheduler();
 	}
 
 	// Overridden method for Runnable
@@ -100,6 +138,17 @@ public class LogWatcherScheduler implements Runnable {
 		} catch (Exception e) {
 			log.error(e.getMessage(), e);
 		}
+	}
+
+	/**
+	 * Method to remove scheduler
+	 */
+	private void removeScheduler() {
+
+		log.info("Removing scheduler...");
+
+		// Unscheduling
+		scheduler.unschedule(schedulerId);
 	}
 
 	/**
@@ -207,65 +256,64 @@ public class LogWatcherScheduler implements Runnable {
 
 			// Getting the instance of StringBuilder for efficient appending
 			StringBuilder sb = new StringBuilder();
-			
+
 			// Reads each line via BufferedReader from the file
 			String stringLine;
-			
+
 			// Flag to determine if we have read desired number of lines
 			boolean broken = false;
-			
-			
+
 			// Counts lines
 			int line = 0;
-			
+
 			// Loop to go through each type of error/exception passed
-			for(String type : types) {
-				
+			for (String type : types) {
+
 				// Loop breaks if we reach to the end of the file
-				while((stringLine = br.readLine()) != null) {
-					
+				while ((stringLine = br.readLine()) != null) {
+
 					// Check if the current line contains the passed error type
-					if(stringLine.contains(type)) {
+					if (stringLine.contains(type)) {
 						// Set the flag - we are now going to capture stack trace
 						broken = true;
 					}
-					
-					if(broken) {
-						
+
+					if (broken) {
+
 						// Add current line to the StringBuilder object
 						sb.append(stringLine + "\n");
-						
+
 						// Increment the line count
 						line++;
 					}
-					
+
 					// Checks if captured desired number of lines
-					if(line == logWatcherConfiguration.traceLines()) {
-						
+					if (line == logWatcherConfiguration.traceLines()) {
+
 						// Reset the flag
 						broken = false;
-						
+
 						// Set the line number to 0 for next instance of error/exception stack trace
 						line = 0;
 					}
 				}
-				
+
 				// Appending new lines
 				sb.append("\n\n");
-				
+
 				// Sending the email
 				emailService.sendEmail(sb.toString());
-				
+
 				// Close BufferedReader
 				br.close();
-				
+
 				// Close DataInputStream
 				dis.close();
-				
+
 				// Close FileInputStream
 				fis.close();
 			}
-			
+
 		} catch (Exception e) {
 			log.error(e.getMessage(), e);
 		}
